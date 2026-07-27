@@ -10,6 +10,7 @@
 #include <string.h>
 #include "config.h"
 #include "pinctrl.h"
+#include "freqmeter.h"
 #include "iec104.h"
 
 /* ASDU type identifiers used. */
@@ -18,9 +19,7 @@
 #define TYPE_C_SC_NA_1 45
 #define TYPE_C_IC_NA_1 100
 
-/* Simulated voltage measurement. */
-#define VOLTAGE_NOMINAL 220.0f
-#define VOLTAGE_INTERVAL_MS 2000
+#define FREQ_REPORT_INTERVAL_MS 2000
 
 /* Causes of transmission used. */
 #define COT_SPONTANEOUS 3
@@ -46,16 +45,7 @@ static enum { WAIT_START, WAIT_LEN, WAIT_BODY } rxState = WAIT_START;
 static uint8_t rxLenExpected = 0;
 static uint8_t rxBody[253];
 static uint8_t rxBodyIdx = 0;
-
-static float currentVoltage = VOLTAGE_NOMINAL;
-static unsigned long lastVoltageMs = 0;
-static bool voltageEnabled = false;
-
-void IEC104_setVoltageEnabled(bool en) { voltageEnabled = en; }
-
-bool IEC104_isVoltageEnabled(void) { return voltageEnabled; }
-
-float IEC104_getVoltage(void) { return currentVoltage; }
+static unsigned long lastFreqReportMs = 0;
 
 static void sendUFormat(uint8_t function) {
   uint8_t frame[6] = {0x68, 4, function, 0, 0, 0};
@@ -91,24 +81,24 @@ static uint8_t buildMSpAsdu(uint8_t *buf, uint8_t cot, bool value) {
 }
 
 /* Builds an M_ME_NC_1 (short floating point measured value) ASDU, returns its length. */
-static uint8_t buildVoltageAsdu(uint8_t *buf, uint8_t cot, float value) {
+static uint8_t buildFreqAsdu(uint8_t *buf, uint8_t cot, float value) {
   buf[0] = TYPE_M_ME_NC_1;
   buf[1] = 0x01; /* VSQ: 1 object, not sequential */
   buf[2] = cot;
   buf[3] = 0; /* originator address */
   buf[4] = (uint8_t)(IEC104_COMMON_ADDR & 0xFF);
   buf[5] = (uint8_t)((IEC104_COMMON_ADDR >> 8) & 0xFF);
-  buf[6] = (uint8_t)(IEC104_IOA_VOLTAGE & 0xFF);
-  buf[7] = (uint8_t)((IEC104_IOA_VOLTAGE >> 8) & 0xFF);
-  buf[8] = (uint8_t)((IEC104_IOA_VOLTAGE >> 16) & 0xFF);
+  buf[6] = (uint8_t)(IEC104_IOA_FREQUENCY & 0xFF);
+  buf[7] = (uint8_t)((IEC104_IOA_FREQUENCY >> 8) & 0xFF);
+  buf[8] = (uint8_t)((IEC104_IOA_FREQUENCY >> 16) & 0xFF);
   memcpy(&buf[9], &value, 4); /* IEEE 754 float, little-endian (native on ESP8266) */
   buf[13] = 0; /* QDS, quality good */
   return 14;
 }
 
-static void sendVoltageReport(uint8_t cot) {
+static void sendFreqReport(uint8_t cot) {
   uint8_t asdu[14];
-  uint8_t len = buildVoltageAsdu(asdu, cot, currentVoltage);
+  uint8_t len = buildFreqAsdu(asdu, cot, FREQMETER_getFrequency());
   sendIFormat(asdu, len);
 }
 
@@ -150,9 +140,7 @@ static void handleAsdu(const uint8_t *asdu, uint8_t len) {
     uint8_t infoLen = buildMSpAsdu(info, COT_INTERROGATED_BY_STATION, PINCTRL_getLed());
     sendIFormat(info, infoLen);
 
-    if (voltageEnabled) {
-      sendVoltageReport(COT_INTERROGATED_BY_STATION);
-    }
+    sendFreqReport(COT_INTERROGATED_BY_STATION);
 
     resp[2] = COT_ACTIVATION_TERM;
     sendIFormat(resp, 10);
@@ -185,16 +173,13 @@ static void handleFrame(const uint8_t *ctrl, const uint8_t *asdu, uint8_t asduLe
 
 void IEC104_init(void) {
   server.begin();
-  randomSeed(millis());
 }
 
 void IEC104_process(void) {
-  if (voltageEnabled && (millis() - lastVoltageMs) >= VOLTAGE_INTERVAL_MS) {
-    lastVoltageMs = millis();
-    currentVoltage = VOLTAGE_NOMINAL * (0.95f + random(0, 1001) / 10000.0f);
-    if (client && client.connected() && started) {
-      sendVoltageReport(COT_SPONTANEOUS);
-    }
+  if (client && client.connected() && started &&
+      (millis() - lastFreqReportMs) >= FREQ_REPORT_INTERVAL_MS) {
+    lastFreqReportMs = millis();
+    sendFreqReport(COT_SPONTANEOUS);
   }
 
   if (!client || !client.connected()) {

@@ -8,6 +8,7 @@
 
 #include "HardwareSerial.h"
 #include "config.h"
+#include "freqmeter.h"
 #include "http_server.h"
 #include "iec104.h"
 #include "pinctrl.h"
@@ -30,6 +31,7 @@ void setup(void) {
   WIFIC_init();
   HTTP_SERVER_init();
   IEC104_init();
+  FREQMETER_init();
 }
 
 void loop(void) {

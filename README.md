@@ -1,9 +1,9 @@
 # ESP8266 IEC 104 Emulator
 
 Emulates an IEC 60870-5-104 outstation on an ESP8266. Exposes one controllable
-point (mirrored to 4 GPIOs for LEDs) and one simulated analog measurement, controllable
-both over IEC104 and a built-in web UI. Also acts as its own WiFi access point
-for initial/remote network configuration.
+point (mirrored to 4 GPIOs for LEDs) and one measured point (mains frequency),
+controllable/viewable both over IEC104 and a built-in web UI. Also acts as its
+own WiFi access point for initial/remote network configuration.
 
 ## Hardware
 
@@ -19,6 +19,17 @@ Board: ESP8266 D1 Mini (or any NodeMCU-pinout ESP8266 board).
 All four LEDs mirror the same single logical point — they turn on/off
 together (see `PINCTRL_setLed()` in `pinctrl.cpp`). Pin numbers are defined in
 `config.h`.
+
+`FREQ_PIN` (GPIO5/D1) reads mains frequency from a zero-crossing pulse — one
+edge per AC cycle expected (e.g. from an opto-isolated zero-cross detector;
+see `freqmeter.cpp`). Not galvanically isolated on its own — never wire this
+pin directly to mains without isolation (optocoupler/transformer) between it
+and the AC side.
+
+Frequency is measured as a single raw cycle period (no averaging), so it
+carries interrupt-jitter noise (roughly ±0.05-0.2Hz per reading on ESP8266
+under WiFi activity). This is a demo of the IEC104 point, not a precision
+instrument.
 
 ## Functionality
 
@@ -36,9 +47,7 @@ together (see `PINCTRL_setLed()` in `pinctrl.cpp`). Pin numbers are defined in
   - LED toggle: green circle = on (click to turn off), gray = off (click to
     turn on). Polls actual state every 1s, so an IEC104 command is reflected
     live.
-  - Voltage checkbox: unchecked by default (measurement disabled/idle).
-    Checking it enables the simulated voltage point, shown next to the
-    checkbox and refreshed every 2s.
+  - Mains frequency, refreshed every 2s; blank if no valid signal.
   - Shows the station IP once connected to an external network.
 - `/selectap` — scans nearby WiFi networks and lets you save a new SSID/password
   (device restarts to apply).
@@ -53,7 +62,7 @@ One TCP master connection at a time. Handles STARTDT/STOPDT/TESTFR
 |------|------------|-------------|
 | 1001 | M_SP_NA_1  | LED state (spontaneous on change, included in GI) |
 | 2001 | C_SC_NA_1  | LED command (turns the LEDs on/off) |
-| 1002 | M_ME_NC_1  | Simulated voltage, ~220V ±5%, streamed every 2s while enabled from the web UI |
+| 1002 | M_ME_NC_1  | Mains frequency, streamed every 2s, included in GI |
 
 IOA/port/common-address values are all in `config.h`.
 

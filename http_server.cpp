@@ -10,7 +10,7 @@
 #include "wifi_connection.h"
 #include "config.h"
 #include "pinctrl.h"
-#include "iec104.h"
+#include "freqmeter.h"
 #include "esp8266_IEC104_emulator.h"
 
 
@@ -45,6 +45,7 @@ static const char INDEX_HTML_0[] PROGMEM = R"(
 
 const char INDEX_HTML_1[] PROGMEM = R"(
   </div>
+  <p id='freqVal'></p>
   <hr>
   <button class="btn_cfg" type="button" onclick="location.href='/selectap';">Configure wifi</button>
   <span id='status'></span>
@@ -76,16 +77,12 @@ const char INDEX_HTML_1[] PROGMEM = R"(
   }
   setInterval(refreshLed, 1000);
 
-  function toggleVoltage(){
-    var en = document.getElementById('voltEnable').checked ? 1 : 0;
-    fetch('/voltage?enabled=' + en);
-  }
-  function refreshVoltage(){
-    fetch('/voltagevalue').then(function(r){ return r.text(); }).then(function(v){
-      document.getElementById('voltVal').innerHTML = v ? (v + ' V') : '';
+  function refreshFreq(){
+    fetch('/freq').then(function(r){ return r.text(); }).then(function(f){
+      document.getElementById('freqVal').innerHTML = f ? ('Frequency: ' + f + ' Hz') : '';
     });
   }
-  setInterval(refreshVoltage, 2000);
+  setInterval(refreshFreq, 2000);
 </script>
 )";
 
@@ -169,17 +166,11 @@ ESP8266WebServer* webServer = nullptr;
 
 void showStartPage() {
   bool ledOn = PINCTRL_getLed();
-  bool voltEnabled = IEC104_isVoltageEnabled();
   String response = FPSTR(HTML_BEGIN);
   response += FPSTR(INDEX_HTML_0);
   response += "<button id=\"ledBtn\" class=\"btn_led ";
   response += String(ledOn ? "btn_led_on" : "btn_led_off");
   response += "\" type=\"button\" onclick=\"toggleLed()\"></button>";
-  response += "<div><input type=\"checkbox\" id=\"voltEnable\" onchange=\"toggleVoltage()\"";
-  if (voltEnabled) {
-    response += " checked";
-  }
-  response += "><label for=\"voltEnable\">Voltage</label> <span id=\"voltVal\"></span></div>";
   response += FPSTR(INDEX_HTML_1);
   response += FPSTR(HTML_END);
   webServer->send(200, "text/html", response);
@@ -218,16 +209,9 @@ static void showLedState(void){
   webServer->send(200, "text/plain", PINCTRL_getLed() ? "1" : "0");
 }
 
-static void setVoltageEnabled(void){
-  if (webServer->hasArg("enabled")) {
-    IEC104_setVoltageEnabled(webServer->arg("enabled").toInt() != 0);
-  }
-  webServer->send(200, "text/plain", "");
-}
-
-static void showVoltageValue(void){
-  String value = IEC104_isVoltageEnabled() ? String(IEC104_getVoltage(), 2) : "";
-  webServer->send(200, "text/plain", value);
+static void showFreq(void){
+  float freq = FREQMETER_getFrequency();
+  webServer->send(200, "text/plain", freq > 0 ? String(freq, 2) : "");
 }
 
 
@@ -314,8 +298,7 @@ void HTTP_SERVER_init(void){
   webServer->on("/wifisave", saveWiFi);
   webServer->on("/constatus", showConStatus);
   webServer->on("/ledstate", showLedState);
-  webServer->on("/voltage", setVoltageEnabled);
-  webServer->on("/voltagevalue", showVoltageValue);
+  webServer->on("/freq", showFreq);
   webServer->onNotFound(showStartPage);
 
   webServer->begin();
