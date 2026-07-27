@@ -50,6 +50,7 @@ const char INDEX_HTML_1[] PROGMEM = R"(
   <button class="btn_cfg" type="button" onclick="location.href='/selectap';">Configure wifi</button>
   <span id='status'></span>
   <br/>
+  <a href="https://github.com/ujagaga/esp8266_IEC104_emulator" target="_blank">github.com/ujagaga/esp8266_IEC104_emulator</a>
 </div>
 <script>
   function checkIp(){

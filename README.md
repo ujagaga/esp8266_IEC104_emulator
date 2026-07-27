@@ -31,6 +31,10 @@ carries interrupt-jitter noise (roughly ±0.05-0.2Hz per reading on ESP8266
 under WiFi activity). This is a demo of the IEC104 point, not a precision
 instrument.
 
+## Schematic
+
+![Schematic](schematic.png)
+
 ## Functionality
 
 ### WiFi
