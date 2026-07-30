@@ -15,7 +15,7 @@ SCRIPT_DIR=$(dirname "${SCRIPT_PATH}")
 
 cd "${SCRIPT_DIR}"
 
-./build.sh || exit 1
+#./build.sh || exit 1
 
 echo "Uploading from ../build"
 
