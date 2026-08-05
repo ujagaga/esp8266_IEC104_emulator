@@ -29,7 +29,7 @@ static void IRAM_ATTR onZeroCross(void) {
 }
 
 void FREQMETER_init(void) {
-  pinMode(FREQ_PIN, INPUT);
+  pinMode(FREQ_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(FREQ_PIN), onZeroCross, RISING);
 }
 
