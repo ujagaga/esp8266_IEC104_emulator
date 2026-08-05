@@ -9,8 +9,8 @@
 #include "config.h"
 #include "freqmeter.h"
 
-#define MIN_PERIOD_US 1000  /* 1000Hz, rejects glitches/bounce */
-#define MAX_PERIOD_US 40000 /* 25Hz, rejects missed-edge glitches */
+#define MIN_PERIOD_US 15384 /* 65Hz, rejects glitches/bounce/noise */
+#define MAX_PERIOD_US 22222 /* 45Hz, rejects missed-edge glitches */
 #define SIGNAL_TIMEOUT_US 100000UL /* no edge for 100ms -> report no signal */
 
 static volatile uint32_t lastEdgeMicros = 0;
