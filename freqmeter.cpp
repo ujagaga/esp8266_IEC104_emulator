@@ -9,9 +9,8 @@
 #include "config.h"
 #include "freqmeter.h"
 
-#define MIN_PERIOD_US 15384 /* 65Hz, rejects glitches/bounce/noise */
+#define MIN_PERIOD_US 18181 /* 55Hz, rejects glitches/bounce/noise */
 #define MAX_PERIOD_US 22222 /* 45Hz, rejects missed-edge glitches */
-#define SIGNAL_TIMEOUT_US 100000UL /* no edge for 100ms -> report no signal */
 
 static volatile uint32_t lastEdgeMicros = 0;
 static volatile uint32_t lastPeriodMicros = 0;
@@ -36,13 +35,14 @@ void FREQMETER_init(void) {
 float FREQMETER_getFrequency(void) {
   noInterrupts();
   uint32_t period = lastPeriodMicros;
-  uint32_t lastEdge = lastEdgeMicros;
   bool have = haveReading;
   interrupts();
 
-  if (!have || (uint32_t)(micros() - lastEdge) > SIGNAL_TIMEOUT_US) {
+  if (!have) {
     return 0.0f;
   }
 
+  /* Hold the last valid reading. WiFi activity blocks the ISR long enough to
+   * miss edges, so a stale value is preferable to a spurious zero. */
   return 1000000.0f / (float)period;
 }
